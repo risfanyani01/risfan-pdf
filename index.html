@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DokuKit – Konversi & Kompres Dokumen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f5;--card:#fff;--ink:#14202b;--mut:#5b6b7a;--line:#d5dce4;--ac:#0b6e7f;--ac2:#e6f3f5;--warn:#b4540a;--ok:#1a7f4b}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1720;--card:#17212c;--ink:#e8eef4;--mut:#93a3b3;--line:#2a3745;--ac:#4cc3d6;--ac2:#14313a;--warn:#f0a35e;--ok:#5fd396}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "IBM Plex Sans",system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:26px;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--mut);margin:0 0 22px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tab{flex:1;padding:11px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;font:inherit;font-weight:500;cursor:pointer}
+.tab[aria-selected=true]{background:var(--ac);border-color:var(--ac);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:14px}
+#drop{border:2px dashed var(--line);border-radius:10px;padding:34px 16px;text-align:center;cursor:pointer;color:var(--mut)}
+#drop.over,#drop:focus-visible{border-color:var(--ac);background:var(--ac2);outline:none}
+#drop b{color:var(--ink)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+label{display:block;font-size:13px;color:var(--mut);margin-bottom:4px}
+select,input[type=range]{font:inherit;color:var(--ink)}
+select{padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);min-width:170px}
+.f{display:flex;flex-direction:column}
+button.go{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:11px 22px;font:inherit;font-weight:600;cursor:pointer}
+button.go:disabled{opacity:.45;cursor:not-allowed}
+button.lnk{background:none;border:0;color:var(--ac);cursor:pointer;font:inherit;padding:0}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:center}
+li:last-child{border:0}
+.n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.s{color:var(--mut);font-size:13px;white-space:nowrap}
+.ok{color:var(--ok)}.bad{color:var(--warn)}
+a.dl{color:var(--ac);font-weight:600;text-decoration:none;white-space:nowrap}
+a.dl:hover{text-decoration:underline}
+.hint{font-size:13px;color:var(--mut);margin:10px 0 0}
+.hide{display:none}
+progress{width:100%;height:6px;accent-color:var(--ac)}
+</style>
+</head>
+<body>
+<main>
+<h1>DokuKit</h1>
+<p class="sub">Konversi dan kompres dokumen langsung di browser. File tidak diunggah ke server mana pun.</p>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" id="t-convert" aria-selected="true">Konversi</button>
+  <button class="tab" role="tab" id="t-compress" aria-selected="false">Kompres</button>
+</div>
+
+<div class="card">
+  <div id="drop" tabindex="0" role="button" aria-label="Pilih file">
+    <b>Tarik file ke sini</b> atau klik untuk memilih<br>
+    <span id="accept-info"></span>
+  </div>
+  <input id="file" type="file" multiple class="hide">
+  <ul id="list"></ul>
+</div>
+
+<div class="card" id="opts">
+  <div class="row" id="o-convert">
+    <div class="f"><label for="target">Ubah ke</label><select id="target"></select></div>
+    <div class="f hide" id="w-scale"><label for="scale">Resolusi gambar PDF</label>
+      <select id="scale"><option value="1">Standar (72 dpi)</option><option value="2" selected>Tinggi (144 dpi)</option><option value="3">Sangat tinggi (216 dpi)</option></select></div>
+  </div>
+  <div class="row hide" id="o-compress">
+    <div class="f"><label for="level">Tingkat kompresi</label>
+      <select id="level"><option value="low">Ringan (kualitas terbaik)</option><option value="mid" selected>Sedang (seimbang)</option><option value="high">Maksimal (ukuran terkecil)</option></select></div>
+    <div class="f hide" id="w-pdfmode"><label for="pdfmode">Metode PDF</label>
+      <select id="pdfmode"><option value="raster">Jadikan gambar (hasil lebih kecil, teks tidak bisa dipilih)</option><option value="keep">Pertahankan teks (hasil kecil hanya jika PDF belum optimal)</option></select></div>
+    <div class="f hide" id="w-imgfmt"><label for="imgfmt">Format gambar keluaran</label>
+      <select id="imgfmt"><option value="image/jpeg">JPG</option><option value="image/webp">WebP</option></select></div>
+  </div>
+  <p class="hint" id="hint"></p>
+  <div style="margin-top:14px"><button class="go" id="go" disabled>Proses</button></div>
+  <progress id="prog" class="hide" max="100" value="0"></progress>
+</div>
+
+<div class="card hide" id="res">
+  <div class="row" style="justify-content:space-between;margin-bottom:6px"><b>Hasil</b><button class="lnk hide" id="zipall">Unduh semua (ZIP)</button></div>
+  <ul id="out"></ul>
+</div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const $=s=>document.querySelector(s);
+let mode='convert',files=[],results=[];
+
+const kindOf=f=>{const n=f.name.toLowerCase();
+  if(f.type.startsWith('image/')||/\.(png|jpe?g|webp|bmp|gif)$/.test(n))return'image';
+  if(n.endsWith('.pdf'))return'pdf';if(n.endsWith('.docx'))return'docx';if(n.endsWith('.txt'))return'txt';return'other'};
+const TARGETS={
+  image:[['png','PNG'],['jpg','JPG'],['webp','WebP'],['pdf','PDF (semua gambar digabung jadi 1 file)']],
+  pdf:[['png','Gambar PNG (1 per halaman)'],['jpg','Gambar JPG (1 per halaman)'],['txt','Teks (TXT)']],
+  docx:[['pdf','PDF'],['html','HTML'],['txt','Teks (TXT)']],
+  txt:[['pdf','PDF']]};
+const fmt=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(2)+' MB';
+const base=n=>n.replace(/\.[^.]+$/,'');
+const blobOf=(c,t,q)=>new Promise(r=>c.toBlob(r,t,q));
+const setProg=v=>{$('#prog').value=v};
+
+/* ---------- UI ---------- */
+function setMode(m){
+  mode=m;files=[];results=[];render();
+  $('#t-convert').setAttribute('aria-selected',m==='convert');
+  $('#t-compress').setAttribute('aria-selected',m==='compress');
+  $('#o-convert').classList.toggle('hide',m!=='convert');
+  $('#o-compress').classList.toggle('hide',m!=='compress');
+  $('#accept-info').textContent=m==='convert'?'Gambar, PDF, DOCX, TXT':'PDF dan gambar (JPG, PNG, WebP)';
+  $('#file').accept=m==='convert'?'image/*,.pdf,.docx,.txt':'image/*,.pdf';
+  $('#res').classList.add('hide');
+}
+$('#t-convert').onclick=()=>setMode('convert');
+$('#t-compress').onclick=()=>setMode('compress');
+$('#drop').onclick=()=>$('#file').click();
+$('#drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('#file').click()}};
+$('#drop').ondragover=e=>{e.preventDefault();$('#drop').classList.add('over')};
+$('#drop').ondragleave=()=>$('#drop').classList.remove('over');
+$('#drop').ondrop=e=>{e.preventDefault();$('#drop').classList.remove('over');add([...e.dataTransfer.files])};
+$('#file').onchange=e=>{add([...e.target.files]);e.target.value=''};
+
+function add(list){
+  const okKinds=mode==='convert'?['image','pdf','docx','txt']:['image','pdf'];
+  const bad=list.filter(f=>!okKinds.includes(kindOf(f)));
+  files.push(...list.filter(f=>okKinds.includes(kindOf(f))));
+  if(bad.length)alert('Format tidak didukung: '+bad.map(f=>f.name).join(', '));
+  render();
+}
+function render(){
+  $('#list').innerHTML='';
+  files.forEach((f,i)=>{
+    const li=document.createElement('li');
+    li.innerHTML=`<span class="n"></span><span class="s">${fmt(f.size)} · <button class="lnk" aria-label="Hapus">Hapus</button></span>`;
+    li.querySelector('.n').textContent=f.name;
+    li.querySelector('button').onclick=()=>{files.splice(i,1);render()};
+    $('#list').append(li);
+  });
+  $('#go').disabled=!files.length;
+  if(mode==='convert'){
+    const kinds=[...new Set(files.map(kindOf))];
+    const t=$('#target');t.innerHTML='';
+    if(kinds.length===1){TARGETS[kinds[0]].forEach(([v,l])=>t.add(new Option(l,v)))}
+    else if(kinds.length>1){t.add(new Option('Pilih file dengan jenis yang sama','',true,true));$('#go').disabled=true}
+    else{t.add(new Option('Pilih file dulu','',true,true))}
+    $('#w-scale').classList.toggle('hide',!(kinds[0]==='pdf'&&kinds.length===1));
+    $('#hint').textContent=kinds.length>1?'Satu proses konversi hanya untuk satu jenis file. Hapus file yang berbeda jenis.':'';
+  }else{
+    const hasPdf=files.some(f=>kindOf(f)==='pdf'),hasImg=files.some(f=>kindOf(f)==='image');
+    $('#w-pdfmode').classList.toggle('hide',!hasPdf);
+    $('#w-imgfmt').classList.toggle('hide',!hasImg);
+    $('#hint').textContent='Jika hasil kompresi lebih besar dari file asli, file asli dipertahankan.';
+  }
+}
+
+/* ---------- Konversi ---------- */
+async function toCanvas(file,maxDim=0){
+  const bmp=await createImageBitmap(file);
+  let w=bmp.width,h=bmp.height;
+  if(maxDim&&Math.max(w,h)>maxDim){const k=maxDim/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k)}
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(bmp,0,0,w,h);
+  return c;
+}
+async function htmlToPdf(html){
+  const el=document.createElement('div');
+  el.style.cssText='position:fixed;left:-9999px;top:0;width:700px;padding:0;font:14px/1.5 Arial,sans-serif;color:#000;background:#fff';
+  el.innerHTML=html;document.body.append(el);
+  try{return await html2pdf().set({margin:15,jsPDF:{unit:'mm',format:'a4'},html2canvas:{scale:2},pagebreak:{mode:['css','legacy']}}).from(el).outputPdf('blob')}
+  finally{el.remove()}
+}
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+async function convertOne(f,target,p){
+  const k=kindOf(f),name=base(f.name);
+  if(k==='image'&&['png','jpg','webp'].includes(target)){
+    const mime={png:'image/png',jpg:'image/jpeg',webp:'image/webp'}[target];
+    return [{name:`${name}.${target}`,blob:await blobOf(await toCanvas(f),mime,.92)}];
+  }
+  if(k==='pdf'&&['png','jpg'].includes(target)){
+    const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise,out=[];
+    const mime=target==='png'?'image/png':'image/jpeg',scale=+$('#scale').value;
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i),vp=pg.getViewport({scale}),c=document.createElement('canvas');
+      c.width=vp.width;c.height=vp.height;
+      const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+      await pg.render({canvasContext:x,viewport:vp}).promise;
+      out.push({name:`${name}-hal${String(i).padStart(2,'0')}.${target}`,blob:await blobOf(c,mime,.92)});
+      p(i/pdf.numPages);
+    }
+    return out;
+  }
+  if(k==='pdf'&&target==='txt'){
+    const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;let t='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const tc=await(await pdf.getPage(i)).getTextContent();
+      t+=`--- Halaman ${i} ---\n`+tc.items.map(s=>s.str+(s.hasEOL?'\n':' ')).join('')+'\n\n';p(i/pdf.numPages);
+    }
+    return [{name:name+'.txt',blob:new Blob([t],{type:'text/plain'})}];
+  }
+  if(k==='docx'){
+    const ab=await f.arrayBuffer();
+    if(target==='txt')return [{name:name+'.txt',blob:new Blob([(await mammoth.extractRawText({arrayBuffer:ab})).value],{type:'text/plain'})}];
+    const html=(await mammoth.convertToHtml({arrayBuffer:ab})).value;
+    if(target==='html')return [{name:name+'.html',blob:new Blob([`<!DOCTYPE html><html lang="id"><meta charset="utf-8"><title>${esc(name)}</title><body style="font-family:Arial,sans-serif;max-width:800px;margin:2rem auto">${html}</body></html>`],{type:'text/html'})}];
+    return [{name:name+'.pdf',blob:await htmlToPdf(html)}];
+  }
+  if(k==='txt'&&target==='pdf'){
+    return [{name:name+'.pdf',blob:await htmlToPdf(`<div style="white-space:pre-wrap">${esc(await f.text())}</div>`)}];
+  }
+  throw new Error('Kombinasi konversi tidak didukung');
+}
+async function imagesToPdf(list,p){
+  const doc=await PDFLib.PDFDocument.create();
+  for(let i=0;i<list.length;i++){
+    const c=await toCanvas(list[i]);
+    const jpg=await doc.embedJpg(await(await blobOf(c,'image/jpeg',.92)).arrayBuffer());
+    const k=Math.min(1,842/Math.max(jpg.width,jpg.height)),w=jpg.width*k,h=jpg.height*k;
+    doc.addPage([w,h]).drawImage(jpg,{x:0,y:0,width:w,height:h});p((i+1)/list.length);
+  }
+  return [{name:'gabungan.pdf',blob:new Blob([await doc.save()],{type:'application/pdf'})}];
+}
+
+/* ---------- Kompres ---------- */
+const LV={low:{q:.85,dim:3000,sc:1.6,pq:.8},mid:{q:.7,dim:2000,sc:1.3,pq:.65},high:{q:.5,dim:1400,sc:1,pq:.5}};
+async function compressOne(f,p){
+  const k=kindOf(f),L=LV[$('#level').value];
+  if(k==='image'){
+    const mime=$('#imgfmt').value,ext=mime==='image/webp'?'webp':'jpg';
+    return [{name:`${base(f.name)}-kecil.${ext}`,blob:await blobOf(await toCanvas(f,L.dim),mime,L.q)}];
+  }
+  const buf=await f.arrayBuffer();
+  if($('#pdfmode').value==='keep'){
+    const doc=await PDFLib.PDFDocument.load(buf,{ignoreEncryption:true});
+    doc.setTitle('');doc.setAuthor('');doc.setSubject('');doc.setKeywords([]);doc.setProducer('');doc.setCreator('');
+    return [{name:`${base(f.name)}-kecil.pdf`,blob:new Blob([await doc.save({useObjectStreams:true})],{type:'application/pdf'})}];
+  }
+  const src=await pdfjsLib.getDocument({data:buf}).promise,out=await PDFLib.PDFDocument.create();
+  for(let i=1;i<=src.numPages;i++){
+    const pg=await src.getPage(i),base1=pg.getViewport({scale:1}),vp=pg.getViewport({scale:L.sc}),c=document.createElement('canvas');
+    c.width=vp.width;c.height=vp.height;
+    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+    await pg.render({canvasContext:x,viewport:vp}).promise;
+    const img=await out.embedJpg(await(await blobOf(c,'image/jpeg',L.pq)).arrayBuffer());
+    out.addPage([base1.width,base1.height]).drawImage(img,{x:0,y:0,width:base1.width,height:base1.height});
+    p(i/src.numPages);
+  }
+  return [{name:`${base(f.name)}-kecil.pdf`,blob:new Blob([await out.save()],{type:'application/pdf'})}];
+}
+
+/* ---------- Jalankan ---------- */
+$('#go').onclick=async()=>{
+  $('#go').disabled=true;$('#prog').classList.remove('hide');setProg(0);
+  results=[];$('#out').innerHTML='';$('#res').classList.remove('hide');
+  const target=$('#target').value,total=files.length;
+  const addRow=(label,status,cls,blob,name)=>{
+    const li=document.createElement('li');
+    const left=document.createElement('span');left.className='n';left.textContent=label;
+    const right=document.createElement('span');right.className='s '+(cls||'');right.textContent=status+' ';
+    if(blob){const a=document.createElement('a');a.className='dl';a.textContent='Unduh';a.href=URL.createObjectURL(blob);a.download=name;right.append(a)}
+    li.append(left,right);$('#out').append(li);
+  };
+  try{
+    if(mode==='convert'&&kindOf(files[0])==='image'&&target==='pdf'){
+      const r=await imagesToPdf(files,v=>setProg(v*100));
+      r.forEach(o=>{results.push(o);addRow(o.name,fmt(o.blob.size),'ok',o.blob,o.name)});
+    }else{
+      for(let i=0;i<total;i++){
+        const f=files[i];
+        try{
+          const r=mode==='convert'?await convertOne(f,target,v=>setProg((i+v)/total*100)):await compressOne(f,v=>setProg((i+v)/total*100));
+          if(mode==='compress'){
+            const o=r[0];
+            if(o.blob.size>=f.size){results.push({name:f.name,blob:f});addRow(f.name,`tidak lebih kecil (${fmt(f.size)}), file asli dipakai`,'bad',f,f.name)}
+            else{results.push(o);const pct=Math.round((1-o.blob.size/f.size)*100);addRow(o.name,`${fmt(f.size)} → ${fmt(o.blob.size)} (−${pct}%)`,'ok',o.blob,o.name)}
+          }else r.forEach(o=>{results.push(o);addRow(o.name,fmt(o.blob.size),'ok',o.blob,o.name)});
+        }catch(e){console.error(e);addRow(f.name,'Gagal: '+(e.message||'file rusak atau terkunci'),'bad')}
+        setProg((i+1)/total*100);
+      }
+    }
+  }catch(e){console.error(e);addRow('Proses gagal',e.message||'','bad')}
+  $('#zipall').classList.toggle('hide',results.length<2);
+  $('#prog').classList.add('hide');$('#go').disabled=false;
+};
+$('#zipall').onclick=async()=>{
+  const z=new JSZip();results.forEach(o=>z.file(o.name,o.blob));
+  const b=await z.generateAsync({type:'blob'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download='hasil-dokukit.zip';a.click();
+};
+setMode('convert');
+</script>
+</body>
+</html>
