@@ -29,6 +29,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:6px;backgroun
 button.go{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:11px 22px;font:inherit;font-weight:600;cursor:pointer}
 button.go:disabled{opacity:.45;cursor:not-allowed}
 button.lnk{background:none;border:0;color:var(--ac);cursor:pointer;font:inherit;padding:0}
+button.lnk:disabled{opacity:.3;cursor:default}
 button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 ul{list-style:none;margin:0;padding:0}
 li{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:center}
@@ -51,6 +52,7 @@ progress{width:100%;height:6px;accent-color:var(--ac)}
 <div class="tabs" role="tablist">
   <button class="tab" role="tab" id="t-convert" aria-selected="true">Konversi</button>
   <button class="tab" role="tab" id="t-compress" aria-selected="false">Kompres</button>
+  <button class="tab" role="tab" id="t-merge" aria-selected="false">Gabung PDF</button>
 </div>
 
 <div class="card">
@@ -75,6 +77,9 @@ progress{width:100%;height:6px;accent-color:var(--ac)}
       <select id="pdfmode"><option value="raster">Jadikan gambar (hasil lebih kecil, teks tidak bisa dipilih)</option><option value="keep">Pertahankan teks (hasil kecil hanya jika PDF belum optimal)</option></select></div>
     <div class="f hide" id="w-imgfmt"><label for="imgfmt">Format gambar keluaran</label>
       <select id="imgfmt"><option value="image/jpeg">JPG</option><option value="image/webp">WebP</option></select></div>
+  </div>
+  <div class="row hide" id="o-merge">
+    <div class="f"><label for="mname">Nama file hasil</label><input id="mname" type="text" value="gabungan" style="padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);min-width:220px;font:inherit;color:var(--ink)"></div>
   </div>
   <p class="hint" id="hint"></p>
   <div style="margin-top:14px"><button class="go" id="go" disabled>Proses</button></div>
@@ -115,14 +120,17 @@ function setMode(m){
   mode=m;files=[];results=[];render();
   $('#t-convert').setAttribute('aria-selected',m==='convert');
   $('#t-compress').setAttribute('aria-selected',m==='compress');
+  $('#t-merge').setAttribute('aria-selected',m==='merge');
   $('#o-convert').classList.toggle('hide',m!=='convert');
   $('#o-compress').classList.toggle('hide',m!=='compress');
-  $('#accept-info').textContent=m==='convert'?'Gambar, PDF, DOCX, TXT':'PDF dan gambar (JPG, PNG, WebP)';
-  $('#file').accept=m==='convert'?'image/*,.pdf,.docx,.txt':'image/*,.pdf';
+  $('#o-merge').classList.toggle('hide',m!=='merge');
+  $('#accept-info').textContent={convert:'Gambar, PDF, DOCX, TXT',compress:'PDF dan gambar (JPG, PNG, WebP)',merge:'Dua file PDF atau lebih'}[m];
+  $('#file').accept={convert:'image/*,.pdf,.docx,.txt',compress:'image/*,.pdf',merge:'.pdf'}[m];
   $('#res').classList.add('hide');
 }
 $('#t-convert').onclick=()=>setMode('convert');
 $('#t-compress').onclick=()=>setMode('compress');
+$('#t-merge').onclick=()=>setMode('merge');
 $('#drop').onclick=()=>$('#file').click();
 $('#drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('#file').click()}};
 $('#drop').ondragover=e=>{e.preventDefault();$('#drop').classList.add('over')};
@@ -131,7 +139,7 @@ $('#drop').ondrop=e=>{e.preventDefault();$('#drop').classList.remove('over');add
 $('#file').onchange=e=>{add([...e.target.files]);e.target.value=''};
 
 function add(list){
-  const okKinds=mode==='convert'?['image','pdf','docx','txt']:['image','pdf'];
+  const okKinds=mode==='convert'?['image','pdf','docx','txt']:mode==='merge'?['pdf']:['image','pdf'];
   const bad=list.filter(f=>!okKinds.includes(kindOf(f)));
   files.push(...list.filter(f=>okKinds.includes(kindOf(f))));
   if(bad.length)alert('Format tidak didukung: '+bad.map(f=>f.name).join(', '));
@@ -141,9 +149,14 @@ function render(){
   $('#list').innerHTML='';
   files.forEach((f,i)=>{
     const li=document.createElement('li');
-    li.innerHTML=`<span class="n"></span><span class="s">${fmt(f.size)} · <button class="lnk" aria-label="Hapus">Hapus</button></span>`;
-    li.querySelector('.n').textContent=f.name;
-    li.querySelector('button').onclick=()=>{files.splice(i,1);render()};
+    const mv=mode==='merge'?`<button class="lnk" data-m="-1" aria-label="Naikkan" ${i?'':'disabled'}>↑</button> <button class="lnk" data-m="1" aria-label="Turunkan" ${i<files.length-1?'':'disabled'}>↓</button> · `:'';
+    li.innerHTML=`<span class="n"></span><span class="s">${mv}${fmt(f.size)} · <button class="lnk" data-m="x" aria-label="Hapus">Hapus</button></span>`;
+    li.querySelector('.n').textContent=(mode==='merge'?(i+1)+'. ':'')+f.name;
+    li.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      const d=b.dataset.m;
+      if(d==='x')files.splice(i,1);else{const j=i+ +d;[files[i],files[j]]=[files[j],files[i]]}
+      render();
+    });
     $('#list').append(li);
   });
   $('#go').disabled=!files.length;
@@ -155,11 +168,14 @@ function render(){
     else{t.add(new Option('Pilih file dulu','',true,true))}
     $('#w-scale').classList.toggle('hide',!(kinds[0]==='pdf'&&kinds.length===1));
     $('#hint').textContent=kinds.length>1?'Satu proses konversi hanya untuk satu jenis file. Hapus file yang berbeda jenis.':'';
-  }else{
+  }else if(mode==='compress'){
     const hasPdf=files.some(f=>kindOf(f)==='pdf'),hasImg=files.some(f=>kindOf(f)==='image');
     $('#w-pdfmode').classList.toggle('hide',!hasPdf);
     $('#w-imgfmt').classList.toggle('hide',!hasImg);
     $('#hint').textContent='Jika hasil kompresi lebih besar dari file asli, file asli dipertahankan.';
+  }else{
+    $('#go').disabled=files.length<2;
+    $('#hint').textContent=files.length===1?'Tambahkan minimal satu PDF lagi untuk digabung.':'Urutan daftar sama dengan urutan halaman di PDF hasil. Atur dengan ↑ dan ↓.';
   }
 }
 
@@ -271,7 +287,20 @@ $('#go').onclick=async()=>{
     li.append(left,right);$('#out').append(li);
   };
   try{
-    if(mode==='convert'&&kindOf(files[0])==='image'&&target==='pdf'){
+    if(mode==='merge'){
+      const out=await PDFLib.PDFDocument.create();
+      for(let i=0;i<total;i++){
+        try{
+          const d=await PDFLib.PDFDocument.load(await files[i].arrayBuffer());
+          (await out.copyPages(d,d.getPageIndices())).forEach(pg=>out.addPage(pg));
+        }catch(e){throw new Error(`"${files[i].name}" tidak bisa dibaca (rusak atau diproteksi password)`)}
+        setProg((i+1)/total*100);
+      }
+      const nm=($('#mname').value.trim().replace(/\.pdf$/i,'')||'gabungan')+'.pdf';
+      const blob=new Blob([await out.save()],{type:'application/pdf'});
+      results.push({name:nm,blob});
+      addRow(`${nm} (${out.getPageCount()} halaman)`,fmt(blob.size),'ok',blob,nm);
+    }else if(mode==='convert'&&kindOf(files[0])==='image'&&target==='pdf'){
       const r=await imagesToPdf(files,v=>setProg(v*100));
       r.forEach(o=>{results.push(o);addRow(o.name,fmt(o.blob.size),'ok',o.blob,o.name)});
     }else{
